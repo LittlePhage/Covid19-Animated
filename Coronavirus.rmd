@@ -1,0 +1,132 @@
+Coronavirus Bar Chart Race by Country
+
+Importing packages and data
+```{r include=FALSE}
+library(coronavirus)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+covid19_df <- refresh_coronavirus_jhu()
+
+covid_df <- data.frame(country = covid19_df$location, date = covid19_df$date, cases = covid19_df$value, type = covid19_df$data_type)
+
+#test with one country
+covid_test <- covid_df[covid_df$country == 'US',]
+cases_test <- aggregate(cases~date+type+country,covid_test,sum)
+cases_testing <- cases_test %>%
+  group_by(type, date,country) %>%
+  summarise(total_cases = sum(cases)) %>%
+  pivot_wider(names_from = type, values_from = total_cases) %>%
+  arrange(date) %>%
+  mutate(active = cases_new - deaths_new - recovered_new)
+
+#every country
+cases_aggregated <- aggregate(cases~date+type+country,covid_df,sum)
+
+cases_active <- cases_aggregated %>% 
+  group_by(type, date,country) %>%
+  summarise(total_cases = sum(cases)) %>%
+  pivot_wider(names_from = type, values_from = total_cases)
+
+#dealing with NAs
+na <- is.na(cases_active)
+cases_active[na] <- 0
+
+cases_active <- cases_active %>%
+  group_by(date,country) %>%
+  arrange(date) %>%
+  mutate(active = cases_new - deaths_new - recovered_new)
+
+cases_active <- cases_active %>%
+  group_by(country) %>%
+  mutate(active_total = cumsum(active))
+  
+```
+
+Get list of countries that were top 10 in confirmed covid cases at anytime
+```{r}
+rank_by_day <- cases_active %>%
+  select(country,date,active_total) %>%
+  group_by(date) %>%
+  arrange(date, -active_total) %>%
+  mutate(rank = 1:n()) %>%
+  filter(rank <= 10)
+
+
+```
+
+New Racing plan
+```{r}
+library(gganimate)
+
+my_theme <- theme_classic(base_family = 'serif') +
+  theme(axis.text.y = element_blank())+
+  theme(axis.ticks.y = element_blank())+
+  theme(axis.line.y = element_blank())+
+  theme(legend.background = element_rect(fill = 'chartreuse'))+
+  theme(panel.background = element_rect(fill = 'chartreuse'))
+
+
+rank_by_day %>%
+  ggplot(aes(xmin = 0,
+    xmax = active/1000,
+  ymin = rank - 0.45,
+    ymax = rank + 0.45,
+    y = rank))+
+  geom_rect() +
+  scale_fill_viridis_d(option = 'magma',
+                       direction = -1) +
+  scale_x_continuous(
+    limits = c(-800,1400),
+    breaks = c(0,400,800,1200) +
+    geom_text(col = 'gray13',
+                hjust = 'right',
+                aes(label = country),
+                x = -50) +
+      scale_y_reverse()
+  ) +
+  labs(x = 'Active cases (thousands)') +
+  labs(y= '')+
+  my_theme ->
+  my_plot
+
+  
+
+```
+
+
+Racing plan (Source: https://www.r-bloggers.com/how-to-create-a-bar-chart-race-in-r-mapping-united-states-city-population-1790-2010/)
+```{r}
+library(hrbrthemes)
+
+
+p <- rank_by_day %>%
+  ggplot(aes(x = -rank, y = active_total, group = country)) +
+  geom_tile(aes(y = active_total/2, height = active_total), width = 0.9, fill = 'aquamarine1') +
+  geom_text(aes(label = country), hjust = 1 , color = 'black', nudge_y = -100000,family = 'serif', size = 8 ) +
+  geom_text(aes(label = scales ::comma(active_total)), hjust = 0, nudge_y = -100000, color = 'grey30',family = 'serif', size = 8) +
+  hrbrthemes::theme_ipsum(base_family = 'serif',plot_title_size =  32, subtitle_size = 24, caption_size = 20, base_size =20) +
+  theme(panel.grid.major.y= element_blank(),
+        panel.grid.minor.x = element_blank(),
+        legend.position = c(0.4,0.2),
+        plot.margin = margin(1,1,1,2,'cm'),
+        axis.text.y = element_blank()) +
+  coord_flip(clip = 'off')+
+  scale_x_discrete('')+
+  scale_y_continuous('',label=scales::comma) +
+  transition_time(date) +
+  ease_aes('cubic-in-out')+
+  labs(title = 'Top 10 Active Covid Cases',
+       subtitle = 'Active Cases in {round(frame_time,0)}',
+       caption = 'Source: John Hopkins University Center for System Science and Engineering, graph by @zchen166')
+        
+  
+  
+animate(p,nframes = 1800, renderer = gifski_renderer('over.gif'), fps = 30, end_pause = 200, width = 1200, height = 900)
+
+
+```
+
+Sources:
+https://github.com/RamiKrispin/coronavirus
+https://www.r-bloggers.com/how-to-create-a-bar-chart-race-in-r-mapping-united-states-city-population-1790-2010/
