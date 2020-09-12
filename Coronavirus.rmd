@@ -122,7 +122,7 @@ p <- rank_by_day %>%
         
   
   
-animate(p,nframes = 1800, renderer = gifski_renderer('over.gif'), fps = 30, end_pause = 200, width = 1200, height = 900)
+animate(p,nframes = 1400, renderer = gifski_renderer('over.gif'), fps = 30, end_pause = 200, width = 1200, height = 900)
 
 
 ```
