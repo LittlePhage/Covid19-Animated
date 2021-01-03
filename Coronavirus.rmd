@@ -6,13 +6,17 @@ library(coronavirus)
 library(tidyverse)
 library(dplyr)
 library(tidyr)
-covid19_df <- refresh_coronavirus_jhu()
 
+#loading data
+covid19_df <- refresh_coronavirus_jhu()
+#creating a custom dataframe to highlight the important features.
 covid_df <- data.frame(country = covid19_df$location, date = covid19_df$date, cases = covid19_df$value, type = covid19_df$data_type)
 
-#test with one country
+#data manipulation test with one country (US)
 covid_test <- covid_df[covid_df$country == 'US',]
+#combines all case values by date and type
 cases_test <- aggregate(cases~date+type+country,covid_test,sum)
+#sums up all cases, re-order rows by date, and creates a new column for active cases
 cases_testing <- cases_test %>%
   group_by(type, date,country) %>%
   summarise(total_cases = sum(cases)) %>%
@@ -20,23 +24,24 @@ cases_testing <- cases_test %>%
   arrange(date) %>%
   mutate(active = cases_new - deaths_new - recovered_new)
 
-#every country
+#applying the data manipulation to every country
 cases_aggregated <- aggregate(cases~date+type+country,covid_df,sum)
 
+#sums up all cases
 cases_active <- cases_aggregated %>% 
   group_by(type, date,country) %>%
   summarise(total_cases = sum(cases)) %>%
   pivot_wider(names_from = type, values_from = total_cases)
 
-#dealing with NAs
+#Replacing Na with zero
 na <- is.na(cases_active)
 cases_active[na] <- 0
-
+#create new column for active cases
 cases_active <- cases_active %>%
   group_by(date,country) %>%
   arrange(date) %>%
   mutate(active = cases_new - deaths_new - recovered_new)
-
+#create new column for total active cases by country
 cases_active <- cases_active %>%
   group_by(country) %>%
   mutate(active_total = cumsum(active))
@@ -45,6 +50,7 @@ cases_active <- cases_active %>%
 
 Get list of countries that were top 10 in confirmed covid cases at anytime
 ```{r}
+#create new dataframe with countries only in top 10 active totals for each date.
 rank_by_day <- cases_active %>%
   select(country,date,active_total) %>%
   group_by(date) %>%
@@ -55,7 +61,7 @@ rank_by_day <- cases_active %>%
 
 ```
 
-New Racing plan
+Testing graph layout
 ```{r}
 library(gganimate)
 
@@ -95,7 +101,7 @@ rank_by_day %>%
 ```
 
 
-Racing plan (Source: https://www.r-bloggers.com/how-to-create-a-bar-chart-race-in-r-mapping-united-states-city-population-1790-2010/)
+New graph layout (Source: https://www.r-bloggers.com/how-to-create-a-bar-chart-race-in-r-mapping-united-states-city-population-1790-2010/)
 ```{r}
 library(hrbrthemes)
 
@@ -121,7 +127,7 @@ p <- rank_by_day %>%
        caption = 'Source: John Hopkins University Center for System Science and Engineering, graph by @zchen166')
         
   
-  
+#generates the final gif  
 animate(p,nframes = 1400, renderer = gifski_renderer('over.gif'), fps = 30, end_pause = 200, width = 1200, height = 900)
 
 
